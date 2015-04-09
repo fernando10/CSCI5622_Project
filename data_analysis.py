@@ -36,10 +36,14 @@ def prepareTrainingData(train_data, questions_data):
     
     return train_X, train_y
 
-def calcRMS(prediction, actual):
+
+def calcRMS(prediction, actual, absvals=False):
     x = 0.0
     for i in range(0,len(actual)):
-        x += (prediction[i] - actual[i])**2
+        if absvals:
+            x += (abs(prediction[i]) - abs(actual[i]))**2
+        else:
+            x += (prediction[i] - actual[i])**2
     x /= (len(actual))
     return math.sqrt(x)
 
@@ -51,8 +55,10 @@ def signMismatchPercentage(prediction,actual):
 
 def doAnalysis(prediction, actual):
     print "-------Analysis----------"
+    absRms = calcRMS(prediction,actual,True)
+    print ("Ignoring correctness of answer, obtained an RMS of: %.2f" % absRms)
     rms = calcRMS(prediction,actual)
-    print ("Obtained an RMS of: %.2f" % rms)
+    print ("Obtained a true RMS of: %.2f" % rms)
     signAccuracy = signMismatchPercentage(prediction,actual)
     print ("Predicted Correct Sign %.2f%% of the time." % signAccuracy)
     print "-------End Analysis------"
