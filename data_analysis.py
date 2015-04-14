@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction import DictVectorizer
 import pdb
 import math
+from collections import defaultdict
 from numpy.core.umath import sign
 #Seed the random so that we can compare code changes
 random.seed(12345)
@@ -25,7 +26,7 @@ def prepareTrainingData(train_data, questions_data):
     questions_data.category = questions_data.category.map(lambda x:np.where(categories == x)[0][0])
     # Get the text length for all the questions
     questions_data["text_length"] = questions_data.tokenized_text.map(lambda x:len(x))
-    
+
     # Build the training set
     train = pd.merge(right=questions_data, left=train_data, left_on="question", right_index=True)
     train_X = train[['user', 'text_length', 'category', 'question']]
@@ -34,15 +35,12 @@ def prepareTrainingData(train_data, questions_data):
     # v.fit_transform(dicts)
     train_y = train[['position']]
     
-    return train_X, train_y
+    return train_X, train_y, categories
 
 
-def calcRMS(prediction, actual, absvals=False):
+def calcRMS(prediction, actual):
     x = 0.0
     for i in range(0,len(actual)):
-        if absvals:
-            x += (abs(prediction[i]) - abs(actual[i]))**2
-        else:
             x += (prediction[i] - actual[i])**2
     x /= (len(actual))
     return math.sqrt(x)
@@ -53,15 +51,29 @@ def signMismatchPercentage(prediction,actual):
         x += (sign(prediction[i]) == sign(actual[i]))    
     return x*100/len(actual)
 
-def doAnalysis(prediction, actual):
-    print "-------Analysis----------"
-    absRms = calcRMS(prediction,actual,True)
+def calcRMSPerCategory(prediction,actual,features,categories):
+    print ("%15s%9s%18s"%("Category","RMS","+/- Accuracy"))
+    for index, category in enumerate(categories):
+        questionIndices = [i for i in range(0,len(actual)) if (features[i][2] == index)]
+        predictionsOfCategory = prediction[questionIndices]
+        actualsOfCategory = actual[questionIndices]
+        rmsForCategory = calcRMS(predictionsOfCategory,actualsOfCategory)
+        signAccuracy = signMismatchPercentage(predictionsOfCategory,actualsOfCategory)
+        print ("%15s%10.2f%12.2f%%" % (category,rmsForCategory,signAccuracy))
+        
+
+def doAnalysis(prediction, actual,features,categories):
+    print "------------Analysis---------------"
+    absRms = calcRMS(abs(prediction),abs(actual))
     print ("Ignoring correctness of answer, obtained an RMS of: %.2f" % absRms)
     rms = calcRMS(prediction,actual)
     print ("Obtained a true RMS of: %.2f" % rms)
     signAccuracy = signMismatchPercentage(prediction,actual)
     print ("Predicted Correct Sign %.2f%% of the time." % signAccuracy)
-    print "-------End Analysis------"
+    
+    calcRMSPerCategory(prediction,actual,features,categories)
+
+    print "------------End Analysis-----------"
 
 
 if __name__ == "__main__":
@@ -75,7 +87,7 @@ if __name__ == "__main__":
     test_data = pd.read_csv('Data/test.csv', index_col=0)
     questions_data = pd.read_csv('Data/questions.csv', index_col=0)
 
-    train_X, train_y = prepareTrainingData(train_data, questions_data)
+    train_X, train_y,categories = prepareTrainingData(train_data, questions_data)
 
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X, train_y, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
@@ -92,7 +104,7 @@ if __name__ == "__main__":
     
     y_test_predict = logReg.predict(x_test)
     
-    doAnalysis(y_test_predict,y_test.ravel())
+    doAnalysis(y_test_predict,y_test.ravel(),x_test,categories)
     
     
     """ Now re-fit the Model on the full data set """
