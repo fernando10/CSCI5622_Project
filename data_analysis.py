@@ -17,6 +17,7 @@ from numpy.core.umath import sign
 random.seed(12345)
 
 def prepareTrainingData(train_data, questions_data):
+    print "Preparing Training Data"
     # Parse the tokenized text as a dictionary and set the values as the keys (bag-of-words)
     questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:{key:value for (key, value) in (ast.literal_eval(x)).iteritems()})
     # Get the categories we're working with:
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     argparser.add_argument("--subsample", help="Percentage of the dataset to use", type=float, default=1.0, required=False)
     argparser.add_argument("--penalty", help="Penalty Function for L.R. (l1 or l2)", type=str, default="l1", required=False)
     argparser.add_argument("--cVal", help="C value for L.R.", type=float, default=10, required=False)
+    argparser.add_argument("--twoStage", help="Splits the classification into two stages, position and correctness", type=bool, default=True, required=False)
     args = argparser.parse_args()
 
     train_data = pd.read_csv('Data/train.csv', index_col=0)
@@ -80,19 +82,43 @@ if __name__ == "__main__":
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X, train_y, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
+    y_train = y_train.ravel()
+    y_test = y_test.ravel()
+
     # Train LogisticRegression Classifier
-    
+    print "Performing regression"
     logReg = LogisticRegression(C=args.cVal, penalty=args.penalty, tol=0.01,random_state=random.randint(0,1000000))
-    logReg.fit_transform(x_train, y_train.ravel())
+    logReg.fit_transform(x_train, abs(y_train) if args.twoStage else y_train)
     coef = logReg.coef_.ravel()
     sparsity = np.mean(coef == 0) * 100
     print("C=%.2f" % args.cVal)
     print("Sparsity with %s penalty: %.2f%%" % (args.penalty,sparsity))
-    print("score with %s penalty: %.4f" % (args.penalty,logReg.score(x_test, y_test.ravel())))
-    
+    print("score with %s penalty: %.4f" % (args.penalty,logReg.score(x_test, y_test)))
+     
     y_test_predict = logReg.predict(x_test)
     
-    doAnalysis(y_test_predict,y_test.ravel())
+    #add the buzz position as a feature for the correctness classifier
+    y_test_predict_r2 = []
+    x_train_r2 = np.zeros((len(x_train),5))
+    x_test_r2 = np.zeros((len(x_test),5))
+
+    logregCorrect = None
+    if args.twoStage:
+        print "Performing second stage regression"
+        for i in range(len(x_train)):
+            x_train_r2[i] = np.append(x_train[i], abs(y_train[i]))
+        
+        logregCorrect = LogisticRegression(C=1, penalty=args.penalty, tol=0.01, random_state=random.randint(0,1000000))
+        logregCorrect.fit_transform(x_train_r2, sign(y_train))
+        
+        for i in range(len(x_test)):
+            x_test_r2[i] = np.append(x_test[i], y_test_predict[i])
+            
+        y_test_predict_r2 = logregCorrect.predict(x_test_r2)
+        for j in range(len(y_test_predict)):
+            y_test_predict[j] = sign(y_test_predict_r2[j]) * y_test_predict[j] 
+    
+    doAnalysis(y_test_predict,y_test)
     
     
     """ Now re-fit the Model on the full data set """
