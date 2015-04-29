@@ -103,10 +103,10 @@ if __name__ == "__main__":
 
     train_X, train_y = prepareTrainingData(train_data, questions_data)
     train_X = train_X.as_matrix()
-    temp = np.zeros((len(train_X),154))
+    temp = np.zeros((len(train_X),len(train_X[0]) + 150))
     for i in range(len(train_X)):
-        b = list(train_X[i][0:4])
-        b.extend(train_X[i][4])
+        b = list(train_X[i][0:])
+        b.extend(train_X[i][-1])
         temp[i] = np.array(b)
     train_X = temp
     # Split the training set into dev_test and dev_train
@@ -139,8 +139,8 @@ if __name__ == "__main__":
     
     #add the buzz position as a feature for the correctness classifier
     y_test_predict_r2 = []
-    x_train_r2 = np.zeros((len(x_train),155))
-    x_test_r2 = np.zeros((len(x_test),155))
+    x_train_r2 = np.zeros((len(x_train),len(x_train[0]) + 1))
+    x_test_r2 = np.zeros((len(x_test),len(x_train[0]) + 1))
 
     logregCorrect = None
     if args.twoStage:
