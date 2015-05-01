@@ -140,7 +140,7 @@ def doAnalysis(prediction, actual,features,categories):
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--subsample", help="Percentage of the dataset to use", type=float, default=.2, required=False)
+    argparser.add_argument("--subsample", help="Percentage of the dataset to use", type=float, default=1, required=False)
     argparser.add_argument("--penalty", help="Penalty Function for L.R. (l1 or l2)", type=str, default="l2", required=False)
     argparser.add_argument("--cVal", help="C value for L.R.", type=float, default=10, required=False)
     argparser.add_argument("--twoStage", help="Splits the classification into two stages, position and correctness", type=bool, default=True, required=False)
@@ -172,7 +172,7 @@ if __name__ == "__main__":
 
     # Train LogisticRegression Classifier
     print "Performing regression"
-    logReg = LogisticRegression()
+    logReg = LogisticRegression(C=args.cVal, penalty=args.penalty)
     logReg.fit(x_train, abs(y_train) if args.twoStage else y_train)
     coef = logReg.coef_.ravel()
 #    print("DEBUG: Coefficient matrix is %dx%d" % (len(coef),len(coef[0])))
