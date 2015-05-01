@@ -95,11 +95,17 @@ if __name__ == "__main__":
     argparser.add_argument("--penalty", help="Penalty Function for L.R. (l1 or l2)", type=str, default="l2", required=False)
     argparser.add_argument("--cVal", help="C value for L.R.", type=float, default=10, required=False)
     argparser.add_argument("--twoStage", help="Splits the classification into two stages, position and correctness", type=bool, default=True, required=False)
+    argparser.add_argument("--truncateInput", help="Number of lines to truncate the input files to when parsing", type=int, default=10, required=False)
     args = argparser.parse_args()
 
     train_data = pd.read_csv('Data/train.csv', index_col=0)
     test_data = pd.read_csv('Data/test.csv', index_col=0)
     questions_data = pd.read_csv('Data/questions_ner.csv', index_col=0)
+
+    if (args.truncateInput > 0):
+        train_data = train_data[:args.truncateInput]
+        test_data = test_data[:args.truncateInput]
+        questions_data = questions_data[:args.truncateInput]
 
     train_X, train_y = prepareTrainingData(train_data, questions_data)
     train_X = train_X.as_matrix()
