@@ -32,13 +32,9 @@ def prepareQuestionData(questions_data):
 
     return questions_data, categories
 
-def prepareTrainingData(train_data, questions_data):
-    print "Preparing Training Data"
-    # Build the training set
-    
+def prepareXData(train_data, questions_data):
     train = pd.merge(right=questions_data, left=train_data, left_on="question", right_index=True)
     train_X = train[['user', 'text_length', 'category', 'question','ner']]
-    train_y = train[['position']]
     
     train_X = train_X.as_matrix()
     x_len = len(train_X[0])
@@ -48,24 +44,22 @@ def prepareTrainingData(train_data, questions_data):
         b.extend(train_X[i][-1])
         temp[i] = np.array(b)
     train_X = temp
-    
+
+    return train_X, train
+
+def prepareTrainingData(train_data, questions_data):
+    print "Preparing Training Data"
+    # Build the training set
+    train_X, train = prepareXData(train_data, questions_data)
+    train_y = train[['position']]
+
     return train_X, train_y
 
 def prepareTestData(test_data, questions_data):
     print "Preparing Test Data"
     # Build the test set
     
-    test = pd.merge(right=questions_data, left=test_data, left_on="question", right_index=True)
-    test_X = test[['user', 'text_length', 'category', 'question','ner']]
-    
-    test_X = test_X.as_matrix()
-    x_len = len(test_X[0])
-    temp = np.zeros((len(test_X),x_len + len(test_X[0][-1]) -1))
-    for i in range(len(test_X)):
-        b = list(test_X[i][0:x_len - 1])
-        b.extend(test_X[i][-1])
-        temp[i] = np.array(b)
-    test_X = temp
+    test_X, train = prepareXData(test_data, questions_data)
 
     return test_X
 
