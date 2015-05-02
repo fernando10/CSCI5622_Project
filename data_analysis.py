@@ -224,7 +224,6 @@ if __name__ == "__main__":
     logReg.fit_transform(train_X, abs(train_y) if args.twoStage else train_y)
 
     # Build the test set
-    print "Preparing test data"
     test = prepareTestData(test_data, questions_data)
 
     # Get predictions
