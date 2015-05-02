@@ -104,12 +104,12 @@ def reshapeFeatureVector(train_X, columnWidths):
                 for ii in range(int(colWidth)):
                     if (ii < len(featureVector[origColIndex])):
                         newFeatureMatrix[rowIndex][newColumnIndex + ii] = featureVector[origColIndex][ii]
-            
+
             newColumnIndex += colWidth
-    
+
     return newFeatureMatrix
 
-def flattenFeaturesIntoColumns(train_X):
+def getFeatureColumnWidths(train_X):
     columnWidths = np.zeros(train_X.shape[1])
 
     for row in train_X:
@@ -169,11 +169,12 @@ if __name__ == "__main__":
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X, train_y, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
-    x_train = flattenFeaturesIntoColumns(x_train)
-    x_test = flattenFeaturesIntoColumns(x_test)
+    widths = getFeatureColumnWidths(x_train)
+    x_train = reshapeFeatureVector(x_train, widths)
+    x_test = reshapeFeatureVector(x_test, widths)
     # Train Regression
     print "Performing regression"
-
+    pdb.set_trace()
     reg = SVR(kernel='rbf', C=1e3, gamma=0.1)
     #reg = DecisionTreeRegressor(max_depth=5)
     y_train = np.array([x[0] for x in y_train])
