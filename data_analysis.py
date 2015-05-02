@@ -9,6 +9,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.cross_validation import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction import DictVectorizer
 import pdb
@@ -29,25 +30,21 @@ def prepareTrainingData(train_data, questions_data):
     # Get the text length for all the questions
     questions_data["text_length"] = questions_data.tokenized_text.map(lambda x:len(x))
     # Process the NER columns (convert to dictionary)
-    questions_data.DATE = questions_data.DATE.map(lambda x: processNERData('DATE', x))
-    # questions_data.LOCATION = questions_data.LOCATION.map(lambda x: ast.literal_eval(x))
-    # questions_data.MONEY = questions_data.MONEY.map(lambda x: ast.literal_eval(x))
-    # questions_data.ORGANIZATION = questions_data.ORGANIZATION.map(lambda x: ast.literal_eval(x))
-    # questions_data.PERCENT = questions_data.PERCENT.map(lambda x: ast.literal_eval(x))
-    # questions_data.PERSON = questions_data.PERSON.map(lambda x: ast.literal_eval(x))
-    # questions_data.TIME = questions_data.TIME.map(lambda x: ast.literal_eval(x))
+    questions_data.DATE = questions_data.DATE.map(lambda x: ast.literal_eval(x))
+    questions_data.LOCATION = questions_data.LOCATION.map(lambda x: ast.literal_eval(x))
+    questions_data.MONEY = questions_data.MONEY.map(lambda x: ast.literal_eval(x))
+    questions_data.ORGANIZATION = questions_data.ORGANIZATION.map(lambda x: ast.literal_eval(x))
+    questions_data.PERCENT = questions_data.PERCENT.map(lambda x: ast.literal_eval(x))
+    questions_data.PERSON = questions_data.PERSON.map(lambda x: ast.literal_eval(x))
+    questions_data.TIME = questions_data.TIME.map(lambda x: ast.literal_eval(x))
+    #entities = questions_data[['DATE', 'MONEY', 'ORGANIZATION', 'PERCENT', PERSON, TIME"]]
+    #questions_data.accinfo = questions_data.apply(buildAccumulatedQuestionInformation, axis=1)
 
-    #vec = DictVectorizer()
-    #date = vec.fit_transform(questions_data.DATE)
-
-
-
-    pdb.set_trace()
     #questions_data.ner = questions_data.ner.map(buildWordCategoryFeatures)
 
     # Build the training set
     train = pd.merge(right=questions_data, left=train_data, left_on="question", right_index=True)
-    train_X = train[['user', 'text_length', 'category', 'question','ner']]
+    train_X = train[['user', 'text_length', 'category', 'question', 'DATE', 'LOCATION', 'MONEY', 'ORGANIZATION', 'PERCENT', 'PERSON', 'TIME']]
     # dicts = list(x[0] for x in train_X[['tokenized_text']].values)
     # v = DictVectorizer()
     # v.fit_transform(dicts)
@@ -55,13 +52,20 @@ def prepareTrainingData(train_data, questions_data):
 
     return train_X, train_y
 
+# def buildAccumulatedQuestionInformation(row):
+#     newFeatureVector = []
+#     multiplier = 0.1
+#     for index, item in enumerate(row.tokenized_text.iteritems()):
+#         newFeatureVector.append[multiplier*]
+#     return 0
+
 def processNERData(label, index_input):
     indexes = ast.literal_eval(index_input)
     counter = 0
     ret = {}
     for ii, word_position in enumerate(indexes):
         # Skip contiguous indexes, probably the same work tagged several times, like "Albert\PERSON Einstein\PERSON"
-        if ii > 0 and indexes[ii-1] == indexes[ii]:
+        if (ii > 0 and indexes[ii-1] == word_position):
             continue
 
         ret[label + str(counter)] = word_position
@@ -88,6 +92,35 @@ def buildWordCategoryFeatures(nerString):
     vectorizer = DictVectorizer()
     return vectorizer.fit_transform(positionValues).toarray()[0].tolist()
 
+def flattenFeaturesIntoColumns(train_X):
+    numRows = train_X.shape[0]
+    numCols = train_X.shape[1]
+    columnWidths = np.zeros(numCols)
+
+    for row in train_X:
+        for index, col in enumerate(row):
+            length = getLengthOfFeature(col)
+            if columnWidths[index] < length:
+                columnWidths[index] = length;
+
+    newFeatureMatrix = np.zeros((numRows,sum(columnWidths)))
+    for rowIndex, featureVector in enumerate(train_X):
+        newColumnIndex = 0
+        for origColIndex, colWidth in enumerate(columnWidths):
+            if colWidth == 1:
+                newFeatureMatrix[rowIndex][newColumnIndex] = featureVector[origColIndex]
+            else:
+                for ii in range(int(colWidth)):
+                    if (ii < len(featureVector[origColIndex])):
+                        newFeatureMatrix[rowIndex][newColumnIndex + ii] = featureVector[origColIndex][ii]
+            newColumnIndex += colWidth
+    return newFeatureMatrix
+
+def getLengthOfFeature(feature):
+    try:
+        return len(feature)
+    except TypeError:
+        return 1
 
 def calcRMS(prediction, actual, absvals=False):
     x = 0.0
@@ -129,88 +162,74 @@ if __name__ == "__main__":
     questions_data = pd.read_csv('Data/questions_ner.csv', index_col=0)
 
     train_X, train_y = prepareTrainingData(train_data, questions_data)
-    # train_X = train_X.as_matrix()
-    # temp = np.zeros((len(train_X),len(train_X[0]) + 150))
-    # for i in range(len(train_X)):
-    #     b = list(train_X[i][0:])
-    #     b.extend(train_X[i][-1])
-    #     pdb.set_trace()
-    #     temp[i] = np.array(b)
-    # train_X = temp
+
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X, train_y, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
-    #pdb.set_trace()
-    #make y's floats so LR doesnt think there are many classes
-    #y_train = y_train.ravel()
-    #y_test = y_test.ravel()
-    #y_train = np.array([float(x) for x in y_train["position"]])
-    #y_test = np.array([float(x) for x in y_test["position"]])
-
-
+    x_train = flattenFeaturesIntoColumns(x_train)
+    x_test = flattenFeaturesIntoColumns(x_test)
     # Train Regression
-    pdb.set_trace()
     print "Performing regression"
-    reg = SVR(kernel='linear', C=1e3)
-    reg.fit(x_train, abs(y_train) if args.twoStage else y_train.ravel())
-    #coef = reg.coef_.ravel()
-#    print("DEBUG: Coefficient matrix is %dx%d" % (len(coef),len(coef[0])))
-    #sparsity = np.mean(coef == 0) * 100
-    #print("C=%.2f" % args.cVal)
-    #print("Sparsity with %s penalty: %.2f%%" % (args.penalty,sparsity))
-    print("score with %s penalty: %.4f" % (args.penalty,reg.score(x_test, y_test)))
+
+    reg = SVR(kernel='rbf', C=1e3, gamma=0.1)
+    #reg = DecisionTreeRegressor(max_depth=5)
+    y_train = np.array([x[0] for x in y_train])
+    reg.fit(x_train, y_train.ravel())
 
     y_test_predict = reg.predict(x_test)
 
-    #add the buzz position as a feature for the correctness classifier
-    y_test_predict_r2 = []
-    x_train_r2 = np.zeros((len(x_train),len(x_train[0]) + 1))
-    x_test_r2 = np.zeros((len(x_test),len(x_train[0]) + 1))
+    # add the buzz position as a feature for the correctness classifier
+    # y_test_predict_r2 = []
+    # x_train_r2 = np.zeros((len(x_train),len(x_train[0]) + 1))
+    # x_test_r2 = np.zeros((len(x_test),len(x_train[0]) + 1))
 
-    logregCorrect = None
-    if args.twoStage:
-        print "Performing second stage fit"
-        for i in range(len(x_train)):
-            x_train_r2[i] = np.append(x_train[i], abs(y_train[i]))
+    # # logregCorrect = None
+    # if args.twoStage:
+    #     print "Performing second stage fit"
+    #     for i in range(len(x_train)):
+    #         x_train_r2[i] = np.append(x_train[i], abs(y_train[i]))
 
-        #logregCorrect = LogisticRegression(C=1, penalty=args.penalty, tol=0.01)#, random_state=random.randint(0,1000000))
-        #logregCorrect.fit_transform(x_train_r2, sign(y_train))
+    #     #logregCorrect = LogisticRegression(C=1, penalty=args.penalty, tol=0.01)#, random_state=random.randint(0,1000000))
+    #     #logregCorrect.fit_transform(x_train_r2, sign(y_train))
 
-        class_Weights = {1:1,-1:2.5}
-        svmCorrect = SVC(C=1, class_weight=class_Weights)
-        svmCorrect.fit(x_train_r2, sign(y_train))
+    #     class_Weights = {1:1,-1:2.5}
+    #     svmCorrect = SVC(C=1, class_weight=class_Weights)
+    #     svmCorrect.fit(x_train_r2, sign(y_train))
 
-        for i in range(len(x_test)):
-            x_test_r2[i] = np.append(x_test[i], y_test_predict[i])
+    #     for i in range(len(x_test)):
+    #         x_test_r2[i] = np.append(x_test[i], y_test_predict[i])
 
-        print "Performing second stage prediction"
-        #y_test_predict_r2 = logregCorrect.predict(x_test_r2)
-        y_test_predict_r2 = svmCorrect.predict(x_test_r2)
-        y_train_predict_r2 = svmCorrect.predict(x_train_r2)
+    #     print "Performing second stage prediction"
+    #     #y_test_predict_r2 = logregCorrect.predict(x_test_r2)
+    #     y_test_predict_r2 = svmCorrect.predict(x_test_r2)
+    #     y_train_predict_r2 = svmCorrect.predict(x_train_r2)
 
-        for j in range(len(y_test_predict)):
-            y_test_predict[j] = sign(y_test_predict_r2[j]) * y_test_predict[j]
+    #     for j in range(len(y_test_predict)):
+    #         y_test_predict[j] = sign(y_test_predict_r2[j]) * y_test_predict[j]
 
-        for j in range(len(y_train_predict_r2)):
-            y_train_predict_r2[j] *= abs(y_train[j])
+    #     for j in range(len(y_train_predict_r2)):
+    #         y_train_predict_r2[j] *= abs(y_train[j])
 
-        print "Training data analysis:"
-        doAnalysis(y_train_predict_r2, y_train)
+    #     print "Training data analysis:"
+    #     doAnalysis(y_train_predict_r2, y_train)
 
-    print "Test data analysis:"
+    #print "Test data analysis:"
     doAnalysis(y_test_predict,y_test)
 
 
-    """ Now re-fit the Model on the full data set
+    # Now re-fit the Model on the full data set
     # re-train on dev_test + dev_train
-    reg.fit_transform(train_X, train_y.as_matrix(["position"]).ravel())
+    # print "Training Regression"
+    # #pdb.set_trace()
+    # train_y = np.array([x[0] for x in train_y.as_matrix()])
+    # reg.fit(train_X.as_matrix(), train_y.ravel())
 
-    # Build the test set
-    test = pd.merge(right=questions_data, left=test_data, left_on="question", right_index=True)
-    test = test[['user', 'text_length', 'category', 'question']]
+    # # # Build the test set
+    # test = pd.merge(right=questions_data, left=test_data, left_on="question", right_index=True)
+    # test = test[['user', 'text_length', 'category', 'question']]
 
-    # Get predictions
-    predictions = reg.predict(test)
-    test_data["position"] = predictions
-    test_data.to_csv("Data/guess.csv")
-    """
+    # # # Get predictions
+    # predictions = reg.predict(test)
+    # test_data["position"] = predictions
+    # test_data.to_csv("Data/guess.csv")
+
