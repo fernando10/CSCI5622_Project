@@ -92,18 +92,9 @@ def buildWordCategoryFeatures(nerString):
     vectorizer = DictVectorizer()
     return vectorizer.fit_transform(positionValues).toarray()[0].tolist()
 
-def flattenFeaturesIntoColumns(train_X):
-    numRows = train_X.shape[0]
-    numCols = train_X.shape[1]
-    columnWidths = np.zeros(numCols)
 
-    for row in train_X:
-        for index, col in enumerate(row):
-            length = getLengthOfFeature(col)
-            if columnWidths[index] < length:
-                columnWidths[index] = length;
-
-    newFeatureMatrix = np.zeros((numRows,sum(columnWidths)))
+def reshapeFeatureVector(train_X, columnWidths):
+    newFeatureMatrix = np.zeros((train_X.shape[0], sum(columnWidths)))
     for rowIndex, featureVector in enumerate(train_X):
         newColumnIndex = 0
         for origColIndex, colWidth in enumerate(columnWidths):
@@ -113,8 +104,20 @@ def flattenFeaturesIntoColumns(train_X):
                 for ii in range(int(colWidth)):
                     if (ii < len(featureVector[origColIndex])):
                         newFeatureMatrix[rowIndex][newColumnIndex + ii] = featureVector[origColIndex][ii]
+            
             newColumnIndex += colWidth
+    
     return newFeatureMatrix
+
+def flattenFeaturesIntoColumns(train_X):
+    columnWidths = np.zeros(train_X.shape[1])
+
+    for row in train_X:
+        for index, col in enumerate(row):
+            length = getLengthOfFeature(col)
+            if columnWidths[index] < length:
+                columnWidths[index] = length;
+    return columnWidths
 
 def getLengthOfFeature(feature):
     try:
