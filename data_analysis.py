@@ -154,7 +154,7 @@ if __name__ == "__main__":
     if (args.truncateInput > 0):
         train_data = train_data[:args.truncateInput]
         test_data = test_data[:args.truncateInput]
-        questions_data = questions_data[:args.truncateInput]
+        #questions_data = questions_data[:args.truncateInput]
 
     questions_data, categories = prepareQuestionData(questions_data)
     train_X, train_y = prepareTrainingData(train_data, questions_data)
@@ -171,12 +171,14 @@ if __name__ == "__main__":
    
 
     # Train LogisticRegression Classifier
-    print "Performing regression"
+    print "Training regression"
     logReg = LogisticRegression(C=args.cVal, penalty=args.penalty)
     logReg.fit(x_train, abs(y_train) if args.twoStage else y_train)
     coef = logReg.coef_.ravel()
 #    print("DEBUG: Coefficient matrix is %dx%d" % (len(coef),len(coef[0])))
     sparsity = np.mean(coef == 0) * 100
+    
+    print "Performing regression"
     print("C=%.2f" % args.cVal)
     print("Sparsity with %s penalty: %.2f%%" % (args.penalty,sparsity))
     print("score with %s penalty: %.4f" % (args.penalty,logReg.score(x_test, y_test)))
@@ -189,7 +191,7 @@ if __name__ == "__main__":
         x_train_r2 = appendBuzzPosition(x_train, y_train)
         x_test_r2 = appendBuzzPosition(x_test, y_test_predict)
     
-        print "Performing second stage fit"
+        print "Performing second stage training"
         #logregCorrect = LogisticRegression(C=1, penalty=args.penalty, tol=0.01)#, random_state=random.randint(0,1000000))
         #logregCorrect.fit_transform(x_train_r2, sign(y_train))
         
@@ -218,22 +220,30 @@ if __name__ == "__main__":
     '''Now re-fit the Model on the full data set''' 
     # re-train on dev_test + dev_train
     train_y = train_y.as_matrix().ravel()
+    print "Training first-stage guess model"
     logReg.fit_transform(train_X, abs(train_y) if args.twoStage else train_y)
 
     # Build the test set
+    print "Preparing test data"
     test = prepareTestData(test_data, questions_data)
 
     # Get predictions
+    print "Performing first stage guess"
     predictions = logReg.predict(test)
     
     if (args.twoStage):
+        print "Preparing second stage data"
         train_X = appendBuzzPosition(train_X, train_y)
         test = appendBuzzPosition(test, predictions)
         
+        print "Training second stage guess model"
         svmCorrect.fit(train_X, sign(train_y))
+        
+        print "Performing second stage guess"
         predictions_2 = svmCorrect.predict(test)
         for i in range(len(predictions_2)):
             predictions[i] *= sign(predictions_2[i])
     
+    print "Writing results of guess"
     test_data["position"] = predictions
     test_data.to_csv("Data/guess.csv")
