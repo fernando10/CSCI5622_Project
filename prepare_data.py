@@ -12,16 +12,16 @@ def buildWordCategoryFeatures(nerString):
         positionValues[i] = (i+1) *.1
     if (isinstance(nerString, str)):
         sentencePosWithPropNouns = digitRegex.findall(nerString)
-        
+
         if sentencePosWithPropNouns != None:
             positions = [int(x) for x in sentencePosWithPropNouns]
             positionValues[0] = .1
-            
+
             for i in range(1,150):
                 positionValues[i] = positionValues[i-1] + .1
                 if i in positions:
-                    positionValues[i] += 1 
-                    
+                    positionValues[i] += 1
+
     vectorizer = DictVectorizer()
     return vectorizer.fit_transform(positionValues).toarray()[0].tolist()
 
@@ -34,30 +34,27 @@ def appendBuzzPosition(x_data, positions):
 
 
 def prepareQuestionData(questions_data):
-    questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:{key:value for (key, value) in (ast.literal_eval(x)).iteritems()})
-    # Get the categories we're working with:
+    questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:ast.literal_eval(x))
+     # Get the categories we're working with:
     categories = pd.Series(questions_data[["category"]].values.ravel()).unique()
     # Replace the category name with it's corresponding index
     questions_data.category = questions_data.category.map(lambda x:np.where(categories == x)[0][0])
     # Get the text length for all the questions
     questions_data["text_length"] = questions_data.tokenized_text.map(lambda x:len(x))
-    
-    questions_data.ner = questions_data.ner.map(buildWordCategoryFeatures)
+    # Process the NER columns (convert to dictionary)
+    questions_data.DATE = questions_data.DATE.map(lambda x: ast.literal_eval(x))
+    questions_data.LOCATION = questions_data.LOCATION.map(lambda x: ast.literal_eval(x))
+    questions_data.MONEY = questions_data.MONEY.map(lambda x: ast.literal_eval(x))
+    questions_data.ORGANIZATION = questions_data.ORGANIZATION.map(lambda x: ast.literal_eval(x))
+    questions_data.PERCENT = questions_data.PERCENT.map(lambda x: ast.literal_eval(x))
+    questions_data.PERSON = questions_data.PERSON.map(lambda x: ast.literal_eval(x))
+    questions_data.TIME = questions_data.TIME.map(lambda x: ast.literal_eval(x))
 
     return questions_data, categories
 
 def prepareXData(train_data, questions_data):
     train = pd.merge(right=questions_data, left=train_data, left_on="question", right_index=True)
-    train_X = train[['user', 'text_length', 'category', 'question','ner']]
-    
-    train_X = train_X.as_matrix()
-    x_len = len(train_X[0])
-    temp = np.zeros((len(train_X),x_len + len(train_X[0][-1]) -1))
-    for i in range(len(train_X)):
-        b = list(train_X[i][0:x_len - 1])
-        b.extend(train_X[i][-1])
-        temp[i] = np.array(b)
-    train_X = temp
+    train_X = train[['user', 'text_length', 'category', 'question', 'DATE', 'LOCATION', 'MONEY', 'ORGANIZATION', 'PERCENT', 'PERSON', 'TIME']]
 
     return train_X, train
 
@@ -72,7 +69,7 @@ def prepareTrainingData(train_data, questions_data):
 def prepareTestData(test_data, questions_data):
     print "Preparing Test Data"
     # Build the test set
-    
+
     test_X, train = prepareXData(test_data, questions_data)
 
     return test_X
