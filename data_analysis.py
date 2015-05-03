@@ -13,16 +13,34 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction import DictVectorizer
 import pdb
+import pickle
+from sklearn.linear_model.coordinate_descent import Lasso
+from sklearn import linear_model
+
+from scipy.sparse import hstack
+from sklearn.feature_extraction.text import CountVectorizer
+from nltk import bigrams
 import math
 from numpy.core.umath import sign
+from collections import defaultdict
 from sklearn.svm.classes import SVC
 #Seed the random so that we can compare code changes
 random.seed(12345)
 
-def prepareTrainingData(train_data, questions_data):
-    print "Preparing Training Data"
-    # Parse the tokenized text as a dictionary
-    questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:ast.literal_eval(x))
+bigramsDict = defaultdict(int)
+
+def extractBigrams(data):
+    global bigramsDict
+    for text in data.tokenized_text:
+        keys = set(bigramsDict.keys())
+        b = bigrams(text.values())
+        for ii in b:
+            if ii not in keys:
+                bigramsDict[ii] = (len(bigramsDict))
+
+def prepareTrainingData(train_data, questions_data, training=1):
+    print "Preparing {} Data".format("Train" if training else "Test")
+
     # Get the categories we're working with:
     categories = pd.Series(questions_data[["category"]].values.ravel()).unique()
     # Replace the category name with it's corresponding index
@@ -37,20 +55,42 @@ def prepareTrainingData(train_data, questions_data):
     questions_data.PERCENT = questions_data.PERCENT.map(lambda x: ast.literal_eval(x))
     questions_data.PERSON = questions_data.PERSON.map(lambda x: ast.literal_eval(x))
     questions_data.TIME = questions_data.TIME.map(lambda x: ast.literal_eval(x))
-    #entities = questions_data[['DATE', 'MONEY', 'ORGANIZATION', 'PERCENT', PERSON, TIME"]]
-    #questions_data.accinfo = questions_data.apply(buildAccumulatedQuestionInformation, axis=1)
 
-    #questions_data.ner = questions_data.ner.map(buildWordCategoryFeatures)
+    #questions_data = questions_data.apply(createBigramFeatures, axis=1)
 
     # Build the training set
     train = pd.merge(right=questions_data, left=train_data, left_on="question", right_index=True)
     train_X = train[['user', 'text_length', 'category', 'question', 'DATE', 'LOCATION', 'MONEY', 'ORGANIZATION', 'PERCENT', 'PERSON', 'TIME']]
-    # dicts = list(x[0] for x in train_X[['tokenized_text']].values)
-    # v = DictVectorizer()
-    # v.fit_transform(dicts)
-    train_y = train[['position']]
 
-    return train_X, train_y
+    ret = ()
+    if training:
+        train_y = train[['position']]
+        ret = (train_X, train_y)
+    else:
+        ret = train_X
+
+    return ret
+
+def findKey(d,search_value):
+    for k,v in d.iteritems():
+            if v == search_value:
+                return k
+
+def createBigramFeatures(row):
+    arr = np.zeros((1, len(bigramsDict)))[0]
+    bigram = bigrams(row.tokenized_text.values())
+    for b in bigram:
+        try:
+            index = bigramsDict[b]
+        except KeyError:
+            "did not find bigram: {} in dictionary.".format(b)
+            continue
+        arr[index] = findKey(row.tokenized_text, b[1])
+
+    row['bigrams'] = arr
+    return row
+
+
 
 # def buildAccumulatedQuestionInformation(row):
 #     newFeatureVector = []
@@ -158,13 +198,18 @@ if __name__ == "__main__":
     argparser.add_argument("--penalty", help="Penalty Function for L.R. (l1 or l2)", type=str, default="l2", required=False)
     argparser.add_argument("--cVal", help="C value for L.R.", type=float, default=10, required=False)
     argparser.add_argument("--twoStage", help="Splits the classification into two stages, position and correctness", type=bool, default=True, required=False)
+    argparser.add_argument("--kaggle", help="Generate kaggle output", type=bool, default=False, required=False)
     args = argparser.parse_args()
 
     train_data = pd.read_csv('Data/train.csv', index_col=0)
     test_data = pd.read_csv('Data/test.csv', index_col=0)
     questions_data = pd.read_csv('Data/questions_ner.csv', index_col=0)
+    questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:ast.literal_eval(x))
 
+    #bigramsDict = pickle.load(open( "bigrams.p", "rb" ))
     train_X, train_y = prepareTrainingData(train_data, questions_data)
+
+
 
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X, train_y, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
@@ -174,20 +219,21 @@ if __name__ == "__main__":
     x_test = reshapeFeatureVector(x_test, widths)
     # Train Regression
     print "Performing regression"
-    pdb.set_trace()
-    reg = SVR(kernel='rbf', C=1e3, gamma=0.1)
+    #reg = SVR(kernel='rbf', C=1e3, gamma=0.1)
+    reg = linear_model.Lasso(alpha = 0.1)
     #reg = DecisionTreeRegressor(max_depth=5)
-    y_train = np.array([x[0] for x in y_train])
+    y_train = np.array([abs(x[0]) for x in y_train])
     reg.fit(x_train, y_train.ravel())
 
     y_test_predict = reg.predict(x_test)
+    y_train_predict = reg.predict(x_train)
 
     # add the buzz position as a feature for the correctness classifier
-    # y_test_predict_r2 = []
-    # x_train_r2 = np.zeros((len(x_train),len(x_train[0]) + 1))
-    # x_test_r2 = np.zeros((len(x_test),len(x_train[0]) + 1))
+    y_test_predict_r2 = []
+    x_train_r2 = np.zeros((len(x_train),len(x_train[0]) + 1))
+    x_test_r2 = np.zeros((len(x_test),len(x_train[0]) + 1))
 
-    # # logregCorrect = None
+    logregCorrect = None
     # if args.twoStage:
     #     print "Performing second stage fit"
     #     for i in range(len(x_train)):
@@ -214,26 +260,33 @@ if __name__ == "__main__":
     #     for j in range(len(y_train_predict_r2)):
     #         y_train_predict_r2[j] *= abs(y_train[j])
 
-    #     print "Training data analysis:"
-    #     doAnalysis(y_train_predict_r2, y_train)
+    print "Training data analysis:"
+    doAnalysis(reg.predict(x_train), y_train)
 
-    #print "Test data analysis:"
+    print "Test data analysis:"
     doAnalysis(y_test_predict,y_test)
 
+    if args.kaggle:
+        #Now re-fit the Model on the full data set
+        #re-train on dev_test + dev_train
+        print "Training Regression on all the training data"
+        # #pdb.set_trace()
+        widths = getFeatureColumnWidths(train_X.as_matrix())
+        train_X = reshapeFeatureVector(train_X.as_matrix(), widths)
 
-    # Now re-fit the Model on the full data set
-    # re-train on dev_test + dev_train
-    # print "Training Regression"
-    # #pdb.set_trace()
-    # train_y = np.array([x[0] for x in train_y.as_matrix()])
-    # reg.fit(train_X.as_matrix(), train_y.ravel())
+        train_y = np.array([x[0] for x in train_y.as_matrix()]).ravel()
 
-    # # # Build the test set
-    # test = pd.merge(right=questions_data, left=test_data, left_on="question", right_index=True)
-    # test = test[['user', 'text_length', 'category', 'question']]
+        reg.fit(train_X, train_y)
 
-    # # # Get predictions
-    # predictions = reg.predict(test)
-    # test_data["position"] = predictions
-    # test_data.to_csv("Data/guess.csv")
+        # # Build the test set
+        print "Testing..."
+        questions_data = pd.read_csv('Data/questions_ner.csv', index_col=0)
+        questions_data.tokenized_text = questions_data.tokenized_text.map(lambda x:ast.literal_eval(x))
+        test_X = prepareTrainingData(test_data, questions_data, training=0)
+        test_X = reshapeFeatureVector(test_X.as_matrix(), widths)
+
+        # # Get predictions
+        predictions = reg.predict(test_X)
+        test_data["position"] = predictions
+        test_data.to_csv("Data/guess.csv")
 
