@@ -30,6 +30,61 @@ def calcRMSPerCategory(prediction,actual,features,categories):
         signAccuracy = signMismatchPercentage(predictionsOfCategory,actualsOfCategory)
         print ("%15s%10.2f%12.2f%%" % (category,rmsForCategory,signAccuracy))
         
+def doAnalysis(prediction, actual,features,categories):
+    print "------------Analysis---------------"
+    absRms = calcRMS(abs(prediction),abs(actual))
+    print ("Ignoring correctness of answer, obtained an RMS of: %.2f" % absRms)
+    rms = calcRMS(prediction,actual)
+    print ("Obtained a true RMS of: %.2f" % rms)
+    signAccuracy = signMismatchPercentage(prediction,actual)
+    print ("Predicted Correct Sign %.2f%% of the time." % signAccuracy)
+    
+    calcRMSPerCategory(prediction,actual,features,categories)
+
+    print "------------End Analysis-----------"
+    
+def outputUserAnalysis(D, categories):
+    categories.sort()
+    
+    f = open("user_analysis.csv", "w")
+    f.write("user")
+    for c in categories:
+        f.write(",abs(" + str(c) + ")")
+    for c in categories:
+        f.write(","+str(c))
+    f.write("\n")
+    
+    for ukey in sorted(D.keys()):
+        f.write(str(ukey))
+        for c in categories:
+            f.write(",")
+            if c in D[ukey].keys():
+                avg = sum([abs(x) for x in D[ukey][c]]) / len(D[ukey][c])
+                f.write(str(avg))
+        for c in categories:
+            f.write(",")
+            if c in D[ukey].keys():
+                avg = sum(D[ukey][c]) / len(D[ukey][c])
+                f.write(str(avg))
+
+        f.write("\n")
+
+def avgBuzzPerUserByCategory(X, Y):
+    D = dict()
+    users = list(X['user'])
+    categories = list(X['category'])
+    y = list(Y['position'])
+    
+    for i in range(len(users)):
+        if users[i] not in D:
+            D[users[i]] = dict()
+        if categories[i] not in D[users[i]]:
+            D[users[i]][categories[i]] = []
+            
+        D[users[i]][categories[i]].append(y[i])    
+
+    outputUserAnalysis(D, list(set(categories)))
+
 def userQuestionIntersection(train, test):
     trainUsers = list(set(train['user']))
     testUsers = list(set(train['user']))
@@ -51,16 +106,4 @@ def userQuestionIntersection(train, test):
     print "Number of unique questions in train set: " + str(len(trainQuestions))
     print "Number of unique questions in test set: " + str(len(testQuestions))
     print "Number of questions in both sets (Intersection): " + str(len(questionIntersect))
-
-def doAnalysis(prediction, actual,features,categories):
-    print "------------Analysis---------------"
-    absRms = calcRMS(abs(prediction),abs(actual))
-    print ("Ignoring correctness of answer, obtained an RMS of: %.2f" % absRms)
-    rms = calcRMS(prediction,actual)
-    print ("Obtained a true RMS of: %.2f" % rms)
-    signAccuracy = signMismatchPercentage(prediction,actual)
-    print ("Predicted Correct Sign %.2f%% of the time." % signAccuracy)
     
-    calcRMSPerCategory(prediction,actual,features,categories)
-
-    print "------------End Analysis-----------"
