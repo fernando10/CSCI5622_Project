@@ -43,25 +43,25 @@ def doAnalysis(prediction, actual,features,categories):
 
     print "------------End Analysis-----------"
     
-def outputUserAnalysis(D, categories):
-    categories.sort()
+def outputUserAnalysis(D, categoryNames):
+    categoryIndices = range(len(categoryNames))
     
     f = open("user_analysis.csv", "w")
     f.write("user")
-    for c in categories:
-        f.write(",abs(" + str(c) + ")")
-    for c in categories:
-        f.write(","+str(c))
+    for c in categoryIndices:
+        f.write(",abs(" + categoryNames[c] + ")")
+    for c in categoryIndices:
+        f.write(","+categoryNames[c])
     f.write("\n")
     
     for ukey in sorted(D.keys()):
         f.write(str(ukey))
-        for c in categories:
+        for c in categoryIndices:
             f.write(",")
             if c in D[ukey].keys():
                 avg = sum([abs(x) for x in D[ukey][c]]) / len(D[ukey][c])
                 f.write(str(avg))
-        for c in categories:
+        for c in categoryIndices:
             f.write(",")
             if c in D[ukey].keys():
                 avg = sum(D[ukey][c]) / len(D[ukey][c])
@@ -69,7 +69,7 @@ def outputUserAnalysis(D, categories):
 
         f.write("\n")
 
-def avgBuzzPerUserByCategory(X, Y):
+def avgBuzzPerUserByCategory(X, Y, categoryNames):
     D = dict()
     users = list(X['user'])
     categories = list(X['category'])
@@ -83,7 +83,7 @@ def avgBuzzPerUserByCategory(X, Y):
             
         D[users[i]][categories[i]].append(y[i])    
 
-    outputUserAnalysis(D, list(set(categories)))
+    outputUserAnalysis(D, categoryNames)
 
 def userQuestionIntersection(train, test):
     trainUsers = list(set(train['user']))
