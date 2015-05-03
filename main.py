@@ -50,7 +50,8 @@ if __name__ == "__main__":
 
     questions_data, categories = prepareQuestionData(questions_data)
     train_X, train_y = prepareTrainingData(train_data, questions_data)
-
+    test_X = prepareTestData(test_data, questions_data)
+    
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X.as_matrix(), train_y.as_matrix(), train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
@@ -58,8 +59,6 @@ if __name__ == "__main__":
     widths = getFeatureColumnWidths(x_train)
     x_train = reshapeFeatureVector(x_train, widths)
     x_test = reshapeFeatureVector(x_test, widths)
-
-
 
     # Train LogisticRegression Classifier
     print "Training regression"
@@ -96,11 +95,18 @@ if __name__ == "__main__":
         for j in range(len(y_train_predict_r2)):
             y_train_predict_r2[j] *= abs(y_train[j])
 
+
+    print "-----Begin Analysis------"
+    
+    userQuestionIntersection(train_X, test_X)
+    
     print "Training data analysis:"
     doAnalysis(y_train_predict, y_train, x_train, categories)
 
     print "Test data analysis:"
     doAnalysis(y_test_predict,y_test,x_test,categories)
+    
+    print "------End Analysis-------"
 
 
     if args.kaggle:
@@ -110,23 +116,20 @@ if __name__ == "__main__":
         print "Training first-stage guess model"
         logReg.fit_transform(train_X, abs(train_y) if args.twoStage else train_y)
 
-        # Build the test set
-        test = prepareTestData(test_data, questions_data)
-
         # Get predictions
         print "Performing first stage guess"
-        predictions = logReg.predict(test)
+        predictions = logReg.predict(test_X)
 
         if (args.twoStage):
             print "Preparing second stage data"
             train_X = appendBuzzPosition(train_X, train_y)
-            test = appendBuzzPosition(test, predictions)
+            test_X = appendBuzzPosition(test_X, predictions)
 
             print "Training second stage guess model"
             svmCorrect.fit(train_X, sign(train_y))
 
             print "Performing second stage guess"
-            predictions_2 = svmCorrect.predict(test)
+            predictions_2 = svmCorrect.predict(test_X)
             for i in range(len(predictions_2)):
                 predictions[i] *= sign(predictions_2[i])
 
