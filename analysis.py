@@ -30,6 +30,14 @@ def calcRMSPerCategory(prediction,actual,features,categories):
         print ("%15s%10.2f%12.2f%%" % (category,rmsForCategory,signAccuracy))
         
 
+def numAnswersBeyondTextLength(prediction, features):
+    count = 0
+    for ii in range(len(prediction)):
+        if prediction[ii] > features[ii][len(features[ii])-1]:
+            count += 1
+    return count
+
+
 def doAnalysis(prediction, actual,features,categories):
     print "------------Analysis---------------"
     absRms = calcRMS(abs(prediction),abs(actual))
@@ -38,6 +46,8 @@ def doAnalysis(prediction, actual,features,categories):
     print ("Obtained a true RMS of: %.2f" % rms)
     signAccuracy = signMismatchPercentage(prediction,actual)
     print ("Predicted Correct Sign %.2f%% of the time." % signAccuracy)
+    count = numAnswersBeyondTextLength(prediction,features)
+    print ("Predicted answer beyond text length %d times." % count)
     
     calcRMSPerCategory(prediction,actual,features,categories)
 

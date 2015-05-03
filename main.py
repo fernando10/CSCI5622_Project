@@ -26,9 +26,6 @@ from util import *
 #Seed the random so that we can compare code changes
 random.seed(12345)
 
-
-
-
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--subsample", help="Percentage of the dataset to use", type=float, default=1, required=False)
@@ -46,61 +43,67 @@ if __name__ == "__main__":
     if (args.truncateInput > 0):
         train_data = train_data[:args.truncateInput]
         test_data = test_data[:args.truncateInput]
-        #questions_data = questions_data[:args.truncateInput]
+        
+    # Split the training set into dev_test and dev_train
+    train, test = train_test_split(train_data, train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
     questions_data, categories = prepareQuestionData(questions_data)
-    train_X, train_y = prepareTrainingData(train_data, questions_data)
-
-    # Split the training set into dev_test and dev_train
-    x_train, x_test, y_train, y_test = train_test_split(train_X.as_matrix(), train_y.as_matrix(), train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
-
-    #make y's floats so LR doesnt think there are many classes
+    x_train, y_train = prepareTrainingData(train, questions_data)
+    x_test, testData = prepareTestData(test, questions_data)
+    y_test = testData["position"]
+    
+    x_test = x_test.as_matrix()
+    y_test = y_test.as_matrix().ravel()
+    x_train = x_train.as_matrix()
+    y_train = y_train.as_matrix().ravel()
+    
     widths = getFeatureColumnWidths(x_train)
     x_train = reshapeFeatureVector(x_train, widths)
     x_test = reshapeFeatureVector(x_test, widths)
-
+    
+    
 
 
     # Train LogisticRegression Classifier
     print "Training regression"
-    #logReg = LogisticRegression(C=args.cVal, penalty=args.penalty)
-    logReg = linear_model.Lasso(alpha = 0.1)
-    logReg.fit(x_train, abs(y_train) if args.twoStage else y_train)
+    #linearLasso = LogisticRegression(C=args.cVal, penalty=args.penalty)
+    linearLasso = linear_model.Lasso(alpha = 0.1)
+    linearLasso.fit(x_train, abs(y_train) if args.twoStage else y_train)
 
     print "Performing regression"
-    y_test_predict = logReg.predict(x_test)
-    y_train_predict = logReg.predict(x_train)
+    y_test_pos_predict = linearLasso.predict(x_test)
+    y_train_pos_predict = linearLasso.predict(x_train)
 
     svmCorrect = None
     if args.twoStage:
         #add the buzz position as a feature for the correctness classifier
         x_train_r2 = appendBuzzPosition(x_train, y_train)
-        x_test_r2 = appendBuzzPosition(x_test, y_test_predict)
+        x_test_r2 = appendBuzzPosition(x_test, y_test_pos_predict)
 
         print "Performing second stage training"
         #logregCorrect = LogisticRegression(C=1, penalty=args.penalty, tol=0.01)#, random_state=random.randint(0,1000000))
-        #logregCorrect.fit_transform(x_train_r2, sign(y_train))
+        #logregCorrect.fit_transform(x_train_r2, sign(y_train.ravel()))
 
         class_Weights = {1:1,-1:2.5}
-        svmCorrect = SVC(C=1, class_weight=class_Weights)
-        svmCorrect.fit(x_train_r2, sign(y_train))
+        svmCorrect = SVC(C=.1, class_weight=class_Weights)
+        svmCorrect.fit(x_train_r2, sign(y_train.ravel()))
 
         print "Performing second stage prediction"
-        #y_test_predict_r2 = logregCorrect.predict(x_test_r2)
-        y_test_predict_r2 = svmCorrect.predict(x_test_r2)
-        y_train_predict_r2 = svmCorrect.predict(x_train_r2)
+        #y_test_sign_predict = logregCorrect.predict(x_test_r2)
+        y_test_sign_predict = svmCorrect.predict(x_test_r2)
+        y_train_sign_predict = svmCorrect.predict(x_train_r2)
+        
+        for j in range(len(y_test_pos_predict)):
+            y_test_pos_predict[j] = sign(y_test_sign_predict[j]) * y_test_pos_predict[j]
 
-        for j in range(len(y_test_predict)):
-            y_test_predict[j] = sign(y_test_predict_r2[j]) * y_test_predict[j]
-
-        for j in range(len(y_train_predict_r2)):
-            y_train_predict_r2[j] *= abs(y_train[j])
+        for j in range(len(y_train_pos_predict)):
+            y_train_pos_predict[j] = sign(y_train_sign_predict[j]) * y_train_pos_predict[j]
 
     print "Training data analysis:"
-    doAnalysis(y_train_predict, y_train, x_train, categories)
+    doAnalysis(y_train_pos_predict, y_train, x_train, categories)
 
     print "Test data analysis:"
-    doAnalysis(y_test_predict,y_test,x_test,categories)
+    doAnalysis(y_test_pos_predict, y_test, x_test, categories)
 
 
     if args.kaggle:
@@ -108,14 +111,14 @@ if __name__ == "__main__":
         # re-train on dev_test + dev_train
         train_y = train_y.as_matrix().ravel()
         print "Training first-stage guess model"
-        logReg.fit_transform(train_X, abs(train_y) if args.twoStage else train_y)
+        linearLasso.fit_transform(train_X, abs(train_y) if args.twoStage else train_y)
 
         # Build the test set
         test = prepareTestData(test_data, questions_data)
 
         # Get predictions
         print "Performing first stage guess"
-        predictions = logReg.predict(test)
+        predictions = linearLasso.predict(test)
 
         if (args.twoStage):
             print "Preparing second stage data"

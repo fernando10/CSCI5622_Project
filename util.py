@@ -1,11 +1,14 @@
 import numpy as np
+import pdb
 
-def reshapeFeatureVector(train_X, columnWidths):
-    newFeatureMatrix = np.zeros((train_X.shape[0], sum(columnWidths)))
-    for rowIndex, featureVector in enumerate(train_X):
+def reshapeFeatureVector(featureVector, columnWidths):
+    newFeatureMatrix = np.zeros((featureVector.shape[0], sum(columnWidths)))
+    for rowIndex, featureVector in enumerate(featureVector):
         newColumnIndex = 0
         for origColIndex, colWidth in enumerate(columnWidths):
             if colWidth == 1:
+                if not isinstance(featureVector[origColIndex],int) and not isinstance(featureVector[origColIndex],float) and not isinstance(featureVector[origColIndex],long):
+                    pdb.set_trace()
                 newFeatureMatrix[rowIndex][newColumnIndex] = featureVector[origColIndex]
             else:
                 for ii in range(int(colWidth)):
