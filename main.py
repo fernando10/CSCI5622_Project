@@ -52,9 +52,6 @@ if __name__ == "__main__":
     train_X, train_y = prepareTrainingData(train_data, questions_data)
     test_X = prepareTestData(test_data, questions_data)
     
-    avgBuzzPerUserByCategory(train_X, train_y, categories)
-    exit()
-    
     # Split the training set into dev_test and dev_train
     x_train, x_test, y_train, y_test = train_test_split(train_X.as_matrix(), train_y.as_matrix(), train_size=args.subsample*0.75, test_size=args.subsample*0.25, random_state=int(random.random()*100))
 
@@ -102,11 +99,13 @@ if __name__ == "__main__":
     print "-----Begin Analysis------"
     
     userQuestionIntersection(train_X, test_X)
-    
+        
     print "Training data analysis:"
+    avgBuzzPerUserByCategory(x_train, y_train, y_train_predict, categories, "user_anal_train.csv")
     doAnalysis(y_train_predict, y_train, x_train, categories)
 
     print "Test data analysis:"
+    avgBuzzPerUserByCategory(x_test, y_test, y_test_predict, categories, "user_anal_test.csv")
     doAnalysis(y_test_predict,y_test,x_test,categories)
     
     print "------End Analysis-------"

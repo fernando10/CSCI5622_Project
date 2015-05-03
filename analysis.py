@@ -43,47 +43,54 @@ def doAnalysis(prediction, actual,features,categories):
 
     print "------------End Analysis-----------"
     
-def outputUserAnalysis(D, categoryNames):
+def outputUserAnalysis(D, categoryNames, filename):
     categoryIndices = range(len(categoryNames))
     
-    f = open("user_analysis.csv", "w")
+    f = open(filename, "w")
     f.write("user")
     for c in categoryIndices:
         f.write(",abs(" + categoryNames[c] + ")")
     for c in categoryIndices:
         f.write(","+categoryNames[c])
+    for c in categoryIndices:
+        f.write(",abs(Predicted " + categoryNames[c] + ")")
+    for c in categoryIndices:
+        f.write(",Predicted "+categoryNames[c])
     f.write("\n")
     
     for ukey in sorted(D.keys()):
         f.write(str(ukey))
-        for c in categoryIndices:
-            f.write(",")
-            if c in D[ukey].keys():
-                avg = sum([abs(x) for x in D[ukey][c]]) / len(D[ukey][c])
-                f.write(str(avg))
-        for c in categoryIndices:
-            f.write(",")
-            if c in D[ukey].keys():
-                avg = sum(D[ukey][c]) / len(D[ukey][c])
-                f.write(str(avg))
+        for i in [0,1]:
+            for c in categoryIndices:
+                f.write(",")
+                if c in D[ukey][i].keys():
+                    avg = sum([abs(x) for x in D[ukey][i][c]]) / len(D[ukey][i][c])
+                    f.write(str(avg))
+            for c in categoryIndices:
+                f.write(",")
+                if c in D[ukey][i].keys():
+                    avg = sum(D[ukey][i][c]) / len(D[ukey][i][c])
+                    f.write(str(avg))
 
         f.write("\n")
 
-def avgBuzzPerUserByCategory(X, Y, categoryNames):
+def avgBuzzPerUserByCategory(X, Y, predicted_Y, categoryNames, filename):
     D = dict()
-    users = list(X['user'])
-    categories = list(X['category'])
-    y = list(Y['position'])
+    users = [int(x[0]) for x in X]
+    categories = [int(x[2]) for x in X]
+    y = Y.ravel()
     
     for i in range(len(users)):
         if users[i] not in D:
-            D[users[i]] = dict()
-        if categories[i] not in D[users[i]]:
-            D[users[i]][categories[i]] = []
+            D[users[i]] = (dict(), dict())
+        if categories[i] not in D[users[i]][0]:
+            D[users[i]][0][categories[i]] = []
+            D[users[i]][1][categories[i]] = []
             
-        D[users[i]][categories[i]].append(y[i])    
+        D[users[i]][0][categories[i]].append(y[i])
+        D[users[i]][1][categories[i]].append(predicted_Y[i])
 
-    outputUserAnalysis(D, categoryNames)
+    outputUserAnalysis(D, categoryNames, filename)
 
 def userQuestionIntersection(train, test):
     trainUsers = list(set(train['user']))
