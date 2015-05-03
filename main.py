@@ -68,7 +68,10 @@ if __name__ == "__main__":
 
     print "Performing regression"
     y_test_predict = logReg.predict(x_test)
+    y_test_predict = ceilingForY(x_test, y_test_predict)
     y_train_predict = logReg.predict(x_train)
+    y_train_predict = ceilingForY(x_train, y_train_predict)
+    
 
     svmCorrect = None
     if args.twoStage:
@@ -121,7 +124,8 @@ if __name__ == "__main__":
         # Get predictions
         print "Performing first stage guess"
         predictions = logReg.predict(test_X)
-
+        predictions = ceilingForY(x_train, predictions)
+        
         if (args.twoStage):
             print "Preparing second stage data"
             train_X = appendBuzzPosition(train_X, train_y)
